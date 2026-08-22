@@ -40,6 +40,9 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x ./gradlew
 
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest
+        
       - name: Decode release keystore
         if: ${{ github.event.inputs.buildType == 'release' }}
         run: |
