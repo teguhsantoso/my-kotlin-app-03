@@ -2,35 +2,72 @@
 
 name: CI
 
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+    inputs:
+      versionName:
+        description: "App version name, for example 1.2.0"
+        type: string
+        required: true
+        default: "1.0.0"
+      buildType:
+        description: "Build type"
+        type: choice
+        required: true
+        default: "debug"
+        options:
+          - debug
+          - release
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  build-android:
+    name: Build Android APK
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
 
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle executable
+        run: chmod +x ./gradlew
+
+      - name: Decode release keystore
+        if: ${{ github.event.inputs.buildType == 'release' }}
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > app/release.keystore
+
+      - name: Build debug APK
+        if: ${{ github.event.inputs.buildType == 'debug' }}
+        run: ./gradlew assembleDebug -PbuildVersionName="${{ github.event.inputs.versionName }}"
+
+      - name: Build release APK
+        if: ${{ github.event.inputs.buildType == 'release' }}
+        run: ./gradlew assembleRelease -PbuildVersionName="${{ github.event.inputs.versionName }}"
+        env:
+          KEYSTORE_FILE: release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Upload debug APK
+        if: ${{ github.event.inputs.buildType == 'debug' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk-${{ github.event.inputs.versionName }}
+          path: app/build/outputs/apk/debug/*.apk
+
+      - name: Upload release APK
+        if: ${{ github.event.inputs.buildType == 'release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk-${{ github.event.inputs.versionName }}
+          path: app/build/outputs/apk/release/*.apk
