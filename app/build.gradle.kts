@@ -10,11 +10,14 @@ android {
     }
 
     defaultConfig {
+        val buildVersionName = project.findProperty("buildVersionName")?.toString() ?: "0.17.0"
+        buildConfigField("String", "VERSION_NAME", "\"$buildVersionName\"")
+
         applicationId = "com.example.myapplication"
         minSdk = 24
         targetSdk = 37
         versionCode = 1
-        versionName = "1.0"
+        versionName = buildVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -32,6 +35,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
