@@ -3,6 +3,9 @@
 name: Test and release APK
 
 on:
+  push:
+    branches-ignore:
+      - main
   workflow_dispatch:
     inputs:
       versionName:
@@ -10,18 +13,14 @@ on:
         type: string
         required: true
         default: "1.0.0"
-      buildType:
-        description: "Build type"
-        type: choice
-        required: true
-        default: "debug"
-        options:
-          - debug
-          - release
+
+env:
+  BUILD_VERSION_NAME: ${{ github.event.inputs.versionName || format('0.0.{0}', github.run_number) }}
 
 jobs:
   unit-tests:
     name: Run Android unit tests
+    if: ${{ github.event_name == 'push' || github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -42,10 +41,11 @@ jobs:
 
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest
-        
+
   build-android:
     name: Build Android APK
     needs: unit-tests
+    if: ${{ needs.unit-tests.result == 'success' && (github.event_name == 'push' || github.ref == 'refs/heads/main') }}
     runs-on: ubuntu-latest
 
     steps:
@@ -63,19 +63,19 @@ jobs:
 
       - name: Make Gradle executable
         run: chmod +x ./gradlew
-        
+
       - name: Decode release keystore
-        if: ${{ github.event.inputs.buildType == 'release' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > app/release.keystore
 
       - name: Build debug APK
-        if: ${{ github.event.inputs.buildType == 'debug' }}
-        run: ./gradlew assembleDebug -PbuildVersionName="${{ github.event.inputs.versionName }}"
+        if: ${{ github.event_name == 'push' }}
+        run: ./gradlew assembleDebug -PbuildVersionName="$BUILD_VERSION_NAME"
 
       - name: Build release APK
-        if: ${{ github.event.inputs.buildType == 'release' }}
-        run: ./gradlew assembleRelease -PbuildVersionName="${{ github.event.inputs.versionName }}"
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+        run: ./gradlew assembleRelease -PbuildVersionName="$BUILD_VERSION_NAME"
         env:
           KEYSTORE_FILE: release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -83,15 +83,15 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
       - name: Upload debug APK
-        if: ${{ github.event.inputs.buildType == 'debug' }}
+        if: ${{ github.event_name == 'push' }}
         uses: actions/upload-artifact@v4
         with:
-          name: debug-apk-${{ github.event.inputs.versionName }}
+          name: debug-apk-${{ env.BUILD_VERSION_NAME }}
           path: app/build/outputs/apk/debug/*.apk
 
       - name: Upload release APK
-        if: ${{ github.event.inputs.buildType == 'release' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
         uses: actions/upload-artifact@v4
         with:
-          name: release-apk-${{ github.event.inputs.versionName }}
+          name: release-apk-${{ env.BUILD_VERSION_NAME }}
           path: app/build/outputs/apk/release/*.apk
