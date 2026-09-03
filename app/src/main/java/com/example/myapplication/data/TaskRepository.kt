@@ -15,7 +15,6 @@ class TaskRepository(context: Context) {
 
     private companion object {
         const val TAG = "TaskRepository"
-
         const val OPERATION_UPSERT = "UPSERT"
         const val OPERATION_UPDATE = "UPDATE"
         const val OPERATION_DELETE = "DELETE"

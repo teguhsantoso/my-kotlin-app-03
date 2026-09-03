@@ -23,13 +23,13 @@ interface TaskAdapter {
     @PATCH("api/tasks/{id}")
     suspend fun updateTask(
         @Path("id") id: String,
-        @Body fields: Map<String, Any?>
-    ): Response<String>
+        @Body fields: Map<String, @JvmSuppressWildcards Any?>
+    ): Response<Unit>
 
     @DELETE("api/tasks/{id}")
     suspend fun deleteTask(
         @Path("id") id: String
-    ): Response<String>
+    ): Response<Unit>
 
     @GET("api/tasks")
     suspend fun getAllTasks(): Response<List<Task>>
